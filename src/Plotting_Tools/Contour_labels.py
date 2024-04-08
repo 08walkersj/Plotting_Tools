@@ -44,8 +44,12 @@ def contour_labels(contour, xpad=None, ypad=None, sides=['left', 'right'], rtol=
         xpad= np.max(np.abs(ax.get_xlim()))*.015
     if ypad is None:
         ypad= np.max(np.abs(ax.get_ylim()))*.015
-    if isinstance(sides, (str, np.str)):
-        sides= [sides]
+    try:
+        if isinstance(sides, (str, np.str)):
+            sides= [sides]
+    except AttributeError:
+        if isinstance(sides, (str)):
+            sides= [sides]
     if x_splits is None or isinstance(x_splits, (str, np.str)):
         x_splits= [x_splits]*len(sides)
     if y_splits is None or isinstance(y_splits, (str, np.str)):

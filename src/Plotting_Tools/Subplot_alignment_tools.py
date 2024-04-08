@@ -1,4 +1,5 @@
 import inspect
+import numpy as np
 class ArgumentError(Exception):
      pass
 def subplot_matchx(axis1, axis2):

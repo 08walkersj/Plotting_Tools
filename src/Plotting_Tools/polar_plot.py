@@ -11,6 +11,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from functools import wraps
 import inspect
+import os
+datapath = os.path.dirname(os.path.abspath(__file__)) + '/coastlines/'
 class ArgumentError(Exception):
      pass
 def get_default_args(func):
@@ -55,15 +57,15 @@ def store_properties(func):
         return q
     return wrapper
 
-def polar(ax, hemisphere='Northern', mode='mag'):
+def polar(ax, hemisphere='Northern', mode='mag', **kwargs):
     if mode.lower()=='mag':
-        return polar_mag(ax, hemisphere=hemisphere)
+        return polar_mag(ax, hemisphere=hemisphere, **kwargs)
     elif mode.lower()=='geo':
-        return polar_geo(ax, hemisphere=hemisphere)
+        return polar_geo(ax, hemisphere=hemisphere, **kwargs)
     else:
         raise ArgumentError("Incorrect mode input must be either 'mag' or 'geo'")
 class polar_mag():
-    def __init__(self, ax, hemisphere='Northern'):
+    def __init__(self, ax, hemisphere='Northern', **kwargs):
         # self= ax.copy()
         # blindcopy(self, ax)
         # for att in inspect.getmembers(ax):
@@ -99,11 +101,12 @@ class polar_mag():
             self.Hadj= -1 # Hemispheric Adjuster
         else:
             raise ArgumentError(f"hemisphere argument incorrect. Must be 'northern' or southern. argument was set to be {hemisphere}")
+        label_kwargs= {key[5:]:kwargs.pop(key) for key in kwargs if key in ['tick_color', 'tick_size']}
         ticks=list(range(0, 100, 10))
         ax.set_rticks(ticks[:int(len(ax.get_yticklabels())/2)+2])
-        ax.set_xticklabels([0, 3, 6, 9, 12, 15, 18, 21])
+        ax.set_xticklabels([0, 3, 6, 9, 12, 15, 18, 21], **label_kwargs)
         labels= np.array((range(90, -10, -10)))*self.Hadj
-        ax.set_yticklabels(labels[:len(ax.get_yticklabels())])
+        ax.set_yticklabels(labels[:len(ax.get_yticklabels())], **label_kwargs)
         ax.set_theta_zero_location('S')
         self.old_plot= ax.plot
         self.old_scatter= ax.scatter
@@ -256,27 +259,55 @@ class polar_mag():
             mlat, mlon= A.geo2apex(lat, lon, height)
             mlt= A.mlon2mlt(mlon, datetime)
             yield mlt,mlat
+        try:
+            for mls in multilinestrings:
+                for ls in mls:
+                    lon, lat = np.array(ls.coords[:]).T
+                    mlat, mlon= A.geo2apex(lat, lon, height)
+                    mlt= A.mlon2mlt(mlon, datetime)
+                    yield mlt, mlat
+        except:
+            pass
+    def get_projected_coastlines_from_file(self, datetime, height, **kwargs):
+            from apexpy import Apex
+            A = Apex(date=datetime)
+            if 'resolution' in kwargs:
+               resolution = kwargs.pop('resolution')
+            else:
+                resolution= '50m'
+            if resolution not in ['50m', '110m']:
+                raise ValueError("Unsupported resolution. Choose either '50m' or '110m'.")
 
-        for mls in multilinestrings:
-            for ls in mls:
-                lon, lat = np.array(ls.coords[:]).T
+            # Load coastline data
+            try:
+                coastlines = np.load(datapath + 'coastlines_' + resolution + '.npz')
+            except FileNotFoundError:
+                raise FileNotFoundError(f"Coastline data file for resolution '{resolution}' not found.")
+            for cl in coastlines:
+                lat, lon = coastlines[cl]
                 mlat, mlon= A.geo2apex(lat, lon, height)
                 mlt= A.mlon2mlt(mlon, datetime)
                 yield mlt, mlat
-    def coastlines(self, datetime, height=0, map_kwargs=None, plot_kwargs=None):
+    def coastlines(self, datetime, height=0, map_kwargs={}, plot_kwargs={}):
+        # try:
+        #     import cartopy
+        #     func= self.get_projected_coastlines
+        # except:
+        func= self.get_projected_coastlines_from_file
         if (plot_kwargs is None):
             plot_kwargs= {'color':'k'}
         elif not('color' in plot_kwargs.keys()):
             plot_kwargs.update({'color':'k'})
         plots=[]
         if map_kwargs is None:
-            for line in self.get_projected_coastlines(datetime,height=height):
+            for line in func(datetime,height=height):
                 plots.extend(self.plot(line[0], line[1], **plot_kwargs))
         else:
-            for line in self.get_projected_coastlines(datetime,height=height, **map_kwargs):
+            for line in func(datetime, height=height, **map_kwargs):
                 plots.extend(self.plot(line[0], line[1], **plot_kwargs))
             
         return plots
+
 class polar_geo():
     def __init__(self, ax, hemisphere='Northern'):
         # self= ax.copy()
