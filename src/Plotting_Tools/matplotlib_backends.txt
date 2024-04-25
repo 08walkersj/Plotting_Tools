@@ -1,1 +1,2 @@
 %matplotlib qt -new window backend
+%matplotlib widget -in line interactive figure (good for notebooks)
