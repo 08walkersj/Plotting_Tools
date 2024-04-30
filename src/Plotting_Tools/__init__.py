@@ -5,4 +5,4 @@ from . import Legend_tools
 from . import Contour_labels
 from . import datetime2MLT
 from . import viewer
-
+from . import Boxplot
